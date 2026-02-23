@@ -1,0 +1,9 @@
+{
+	"id": "focused-sidebar",
+	"name": "Focused Sidebar",
+	"version": "0.1.0",
+	"minAppVersion": "1.0.0",
+	"description": "Toggle any sidebar section to full height with one command.",
+	"author": "Blake Boyd",
+	"isDesktopOnly": true
+}
