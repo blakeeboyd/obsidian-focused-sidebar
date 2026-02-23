@@ -22,7 +22,7 @@ __export(main_exports, {
   default: () => FocusedSidebarPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian = require("obsidian");
+var import_obsidian2 = require("obsidian");
 
 // node_modules/monkey-around/dist/index.mjs
 function around(obj, factories) {
@@ -60,17 +60,88 @@ function around1(obj, method, createWrapper) {
   }
 }
 
+// src/settings.ts
+var import_obsidian = require("obsidian");
+var DEFAULT_SETTINGS = {
+  indicatorStyle: "highlight",
+  useCustomColor: false,
+  customColor: "#7f6df2"
+};
+var STYLE_DESCRIPTIONS = {
+  highlight: "Background tint + underline",
+  underline: "Bottom border only",
+  dot: "Colored dot above the icon",
+  glow: "Soft glow behind the icon",
+  "icon-only": "Icon color change only",
+  button: "Colored button background"
+};
+var FocusedSidebarSettingTab = class extends import_obsidian.PluginSettingTab {
+  constructor(app, plugin) {
+    super(app, plugin);
+    this.plugin = plugin;
+  }
+  display() {
+    const { containerEl } = this;
+    containerEl.empty();
+    new import_obsidian.Setting(containerEl).setName("Indicator style").setDesc("How the focused section's tab is highlighted").addDropdown(
+      (dropdown) => dropdown.addOptions(STYLE_DESCRIPTIONS).setValue(this.plugin.settings.indicatorStyle).onChange(async (value) => {
+        this.plugin.settings.indicatorStyle = value;
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Use custom color").setDesc(
+      "Override the accent color with a custom color for the indicator"
+    ).addToggle(
+      (toggle) => toggle.setValue(this.plugin.settings.useCustomColor).onChange(async (value) => {
+        this.plugin.settings.useCustomColor = value;
+        await this.plugin.saveSettings();
+        this.display();
+      })
+    );
+    if (this.plugin.settings.useCustomColor) {
+      new import_obsidian.Setting(containerEl).setName("Custom color").setDesc("Pick a color for the focus indicator").addColorPicker(
+        (picker) => picker.setValue(this.plugin.settings.customColor).onChange(async (value) => {
+          this.plugin.settings.customColor = value;
+          await this.plugin.saveSettings();
+        })
+      );
+    }
+  }
+};
+
 // src/main.ts
 var COLLAPSED_CLASS = "focused-sidebar-collapsed";
 var ACTIVE_CLASS = "focused-sidebar-active";
-var FocusedSidebarPlugin = class extends import_obsidian.Plugin {
+var TARGET_CLASS = "focused-sidebar-target";
+function hexToRgb(hex) {
+  const h = hex.replace("#", "");
+  const n = parseInt(h, 16);
+  return `${n >> 16 & 255}, ${n >> 8 & 255}, ${n & 255}`;
+}
+function getAccentColor() {
+  const raw = getComputedStyle(document.body).getPropertyValue("--interactive-accent").trim();
+  if (raw.startsWith("#")) return raw;
+  const tmp = document.createElement("div");
+  tmp.style.color = raw;
+  document.body.appendChild(tmp);
+  const computed = getComputedStyle(tmp).color;
+  tmp.remove();
+  const m = computed.match(/(\d+)/g);
+  if (!m) return "#7f6df2";
+  return "#" + m.slice(0, 3).map((n) => parseInt(n).toString(16).padStart(2, "0")).join("");
+}
+var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
   constructor() {
     super(...arguments);
+    this.settings = DEFAULT_SETTINGS;
     this.savedDimensions = /* @__PURE__ */ new Map();
     this.focusedSide = null;
     this.unpatchMenu = null;
+    this.dblClickHandler = null;
   }
   async onload() {
+    await this.loadSettings();
+    this.addSettingTab(new FocusedSidebarSettingTab(this.app, this));
     this.addCommand({
       id: "toggle-focused-sidebar",
       name: "Toggle focused sidebar",
@@ -80,20 +151,51 @@ var FocusedSidebarPlugin = class extends import_obsidian.Plugin {
       this.toggleFocus();
     });
     this.patchMenu();
+    this.registerDblClick();
   }
   onunload() {
     if (this.focusedSide) {
       this.restoreDimensions(this.focusedSide);
       document.body.removeClass(ACTIVE_CLASS);
+      this.removeStyleAttrs();
     }
     if (this.unpatchMenu) {
       this.unpatchMenu();
       this.unpatchMenu = null;
     }
+    if (this.dblClickHandler) {
+      document.removeEventListener("dblclick", this.dblClickHandler, true);
+      this.dblClickHandler = null;
+    }
+  }
+  async loadSettings() {
+    this.settings = Object.assign(
+      {},
+      DEFAULT_SETTINGS,
+      await this.loadData()
+    );
+    this.applyStyleAttrs();
+  }
+  async saveSettings() {
+    await this.saveData(this.settings);
+    this.applyStyleAttrs();
+  }
+  /** Push settings into CSS custom properties and a data attribute on body. */
+  applyStyleAttrs() {
+    const el = document.body;
+    el.dataset.focusedSidebarStyle = this.settings.indicatorStyle;
+    const color = this.settings.useCustomColor ? this.settings.customColor : getAccentColor();
+    el.style.setProperty("--focused-sidebar-color", color);
+    el.style.setProperty("--focused-sidebar-color-rgb", hexToRgb(color));
+  }
+  removeStyleAttrs() {
+    delete document.body.dataset.focusedSidebarStyle;
+    document.body.style.removeProperty("--focused-sidebar-color");
+    document.body.style.removeProperty("--focused-sidebar-color-rgb");
   }
   patchMenu() {
     const plugin = this;
-    this.unpatchMenu = around(import_obsidian.Menu.prototype, {
+    this.unpatchMenu = around(import_obsidian2.Menu.prototype, {
       showAtMouseEvent(old) {
         return function(evt) {
           plugin.maybeAddFocusItem(this, evt);
@@ -102,25 +204,46 @@ var FocusedSidebarPlugin = class extends import_obsidian.Plugin {
       }
     });
   }
-  maybeAddFocusItem(menu, evt) {
+  registerDblClick() {
+    this.dblClickHandler = (evt) => {
+      const hit = this.resolveTabHit(evt);
+      if (!hit) return;
+      const { side, split, sectionIndex, clickedLeaf } = hit;
+      const isFocused = this.focusedSide === side;
+      if (isFocused) {
+        this.unfocus();
+      } else {
+        this.focusSection(side, split, sectionIndex);
+      }
+      if (clickedLeaf) {
+        this.app.workspace.setActiveLeaf(clickedLeaf, { focus: true });
+      }
+    };
+    document.addEventListener("dblclick", this.dblClickHandler, true);
+  }
+  /**
+   * Given a mouse event on a sidebar tab header, resolve which side,
+   * section, and leaf were targeted. Returns null if the click wasn't
+   * on a sidebar tab header or the sidebar has only one section.
+   */
+  resolveTabHit(evt) {
     const target = evt.target;
-    if (!target) return;
+    if (!target) return null;
     const tabHeader = target.closest(".workspace-tab-header");
-    if (!tabHeader) return;
+    if (!tabHeader) return null;
     const tabsEl = tabHeader.closest(".workspace-tabs");
-    if (!tabsEl) return;
+    if (!tabsEl) return null;
     const sidebarEl = tabsEl.closest(
       ".mod-left-split, .mod-right-split"
     );
-    if (!sidebarEl) return;
+    if (!sidebarEl) return null;
     const side = sidebarEl.classList.contains("mod-left-split") ? "left" : "right";
     const split = this.getSplit(side);
-    if (!split || split.children.length <= 1) return;
+    if (!split || split.children.length <= 1) return null;
     const sectionIndex = split.children.findIndex(
       (s) => s.containerEl === tabsEl
     );
-    if (sectionIndex === -1) return;
-    const isFocused = this.focusedSide === side;
+    if (sectionIndex === -1) return null;
     const section = split.children[sectionIndex];
     const tabHeaderContainer = tabsEl.querySelector(
       ".workspace-tab-header-container"
@@ -132,6 +255,13 @@ var FocusedSidebarPlugin = class extends import_obsidian.Plugin {
     ) : [];
     const tabIndex = allHeaders.indexOf(tabHeader);
     const clickedLeaf = tabIndex >= 0 && tabIndex < section.children.length ? section.children[tabIndex] : null;
+    return { side, split, sectionIndex, clickedLeaf };
+  }
+  maybeAddFocusItem(menu, evt) {
+    const hit = this.resolveTabHit(evt);
+    if (!hit) return;
+    const { side, split, sectionIndex, clickedLeaf } = hit;
+    const isFocused = this.focusedSide === side;
     menu.addSeparator();
     menu.addItem((item) => {
       item.setTitle(isFocused ? "Unfocus sidebar" : "Focus this section").setIcon(isFocused ? "minimize" : "maximize").onClick(() => {
@@ -152,12 +282,12 @@ var FocusedSidebarPlugin = class extends import_obsidian.Plugin {
     const side = this.resolveSide();
     const split = this.getSplit(side);
     if (!split) {
-      new import_obsidian.Notice("No sidebar found.");
+      new import_obsidian2.Notice("No sidebar found.");
       return;
     }
     const sections = split.children;
     if (sections.length <= 1) {
-      new import_obsidian.Notice("Sidebar has only one section.");
+      new import_obsidian2.Notice("Sidebar has only one section.");
       return;
     }
     if (this.focusedSide === side) {
@@ -182,9 +312,11 @@ var FocusedSidebarPlugin = class extends import_obsidian.Plugin {
       if (i === sectionIndex) {
         section.dimension = 100;
         section.containerEl.removeClass(COLLAPSED_CLASS);
+        section.containerEl.addClass(TARGET_CLASS);
       } else {
         section.dimension = 0;
         section.containerEl.addClass(COLLAPSED_CLASS);
+        section.containerEl.removeClass(TARGET_CLASS);
       }
     });
     this.applyLayout(split);
@@ -207,6 +339,7 @@ var FocusedSidebarPlugin = class extends import_obsidian.Plugin {
       var _a;
       section.dimension = (_a = saved[i]) != null ? _a : fallback;
       section.containerEl.removeClass(COLLAPSED_CLASS);
+      section.containerEl.removeClass(TARGET_CLASS);
     });
     this.applyLayout(split);
     this.savedDimensions.delete(side);

@@ -1,16 +1,58 @@
 import { Menu, Notice, Plugin, WorkspaceLeaf } from "obsidian";
 import { around } from "monkey-around";
 import { InternalSidedock, InternalWorkspaceTabs } from "./types";
+import {
+	DEFAULT_SETTINGS,
+	FocusedSidebarSettings,
+	FocusedSidebarSettingTab,
+	IndicatorStyle,
+} from "./settings";
 
 const COLLAPSED_CLASS = "focused-sidebar-collapsed";
 const ACTIVE_CLASS = "focused-sidebar-active";
+const TARGET_CLASS = "focused-sidebar-target";
+
+/** Convert hex "#rrggbb" to "r, g, b" for use in rgba(). */
+function hexToRgb(hex: string): string {
+	const h = hex.replace("#", "");
+	const n = parseInt(h, 16);
+	return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
+}
+
+/** Read the resolved accent color from the theme as a hex string. */
+function getAccentColor(): string {
+	const raw = getComputedStyle(document.body)
+		.getPropertyValue("--interactive-accent")
+		.trim();
+	// Could be hex, rgb(), or hsl() — normalise to hex via a throwaway element
+	if (raw.startsWith("#")) return raw;
+	const tmp = document.createElement("div");
+	tmp.style.color = raw;
+	document.body.appendChild(tmp);
+	const computed = getComputedStyle(tmp).color; // always "rgb(r, g, b)"
+	tmp.remove();
+	const m = computed.match(/(\d+)/g);
+	if (!m) return "#7f6df2"; // safe fallback
+	return (
+		"#" +
+		m
+			.slice(0, 3)
+			.map((n) => parseInt(n).toString(16).padStart(2, "0"))
+			.join("")
+	);
+}
 
 export default class FocusedSidebarPlugin extends Plugin {
+	settings: FocusedSidebarSettings = DEFAULT_SETTINGS;
 	private savedDimensions: Map<string, number[]> = new Map();
 	private focusedSide: string | null = null;
 	private unpatchMenu: (() => void) | null = null;
+	private dblClickHandler: ((evt: MouseEvent) => void) | null = null;
 
 	async onload(): Promise<void> {
+		await this.loadSettings();
+		this.addSettingTab(new FocusedSidebarSettingTab(this.app, this));
+
 		this.addCommand({
 			id: "toggle-focused-sidebar",
 			name: "Toggle focused sidebar",
@@ -22,17 +64,55 @@ export default class FocusedSidebarPlugin extends Plugin {
 		});
 
 		this.patchMenu();
+		this.registerDblClick();
 	}
 
 	onunload(): void {
 		if (this.focusedSide) {
 			this.restoreDimensions(this.focusedSide);
 			document.body.removeClass(ACTIVE_CLASS);
+			this.removeStyleAttrs();
 		}
 		if (this.unpatchMenu) {
 			this.unpatchMenu();
 			this.unpatchMenu = null;
 		}
+		if (this.dblClickHandler) {
+			document.removeEventListener("dblclick", this.dblClickHandler, true);
+			this.dblClickHandler = null;
+		}
+	}
+
+	async loadSettings(): Promise<void> {
+		this.settings = Object.assign(
+			{},
+			DEFAULT_SETTINGS,
+			await this.loadData()
+		);
+		this.applyStyleAttrs();
+	}
+
+	async saveSettings(): Promise<void> {
+		await this.saveData(this.settings);
+		this.applyStyleAttrs();
+	}
+
+	/** Push settings into CSS custom properties and a data attribute on body. */
+	private applyStyleAttrs(): void {
+		const el = document.body;
+		el.dataset.focusedSidebarStyle = this.settings.indicatorStyle;
+
+		const color = this.settings.useCustomColor
+			? this.settings.customColor
+			: getAccentColor();
+		el.style.setProperty("--focused-sidebar-color", color);
+		el.style.setProperty("--focused-sidebar-color-rgb", hexToRgb(color));
+	}
+
+	private removeStyleAttrs(): void {
+		delete document.body.dataset.focusedSidebarStyle;
+		document.body.style.removeProperty("--focused-sidebar-color");
+		document.body.style.removeProperty("--focused-sidebar-color-rgb");
 	}
 
 	private patchMenu(): void {
@@ -48,37 +128,65 @@ export default class FocusedSidebarPlugin extends Plugin {
 		});
 	}
 
-	private maybeAddFocusItem(menu: Menu, evt: MouseEvent): void {
-		const target = evt.target as HTMLElement;
-		if (!target) return;
+	private registerDblClick(): void {
+		this.dblClickHandler = (evt: MouseEvent) => {
+			const hit = this.resolveTabHit(evt);
+			if (!hit) return;
 
-		// Check if the click was on a sidebar tab header
+			const { side, split, sectionIndex, clickedLeaf } = hit;
+			const isFocused = this.focusedSide === side;
+
+			if (isFocused) {
+				this.unfocus();
+			} else {
+				this.focusSection(side, split, sectionIndex);
+			}
+
+			if (clickedLeaf) {
+				this.app.workspace.setActiveLeaf(clickedLeaf, { focus: true });
+			}
+		};
+
+		// Capture phase so we fire before Obsidian's own handlers
+		document.addEventListener("dblclick", this.dblClickHandler, true);
+	}
+
+	/**
+	 * Given a mouse event on a sidebar tab header, resolve which side,
+	 * section, and leaf were targeted. Returns null if the click wasn't
+	 * on a sidebar tab header or the sidebar has only one section.
+	 */
+	private resolveTabHit(evt: MouseEvent): {
+		side: string;
+		split: InternalSidedock;
+		sectionIndex: number;
+		clickedLeaf: WorkspaceLeaf | null;
+	} | null {
+		const target = evt.target as HTMLElement;
+		if (!target) return null;
+
 		const tabHeader = target.closest(".workspace-tab-header");
-		if (!tabHeader) return;
+		if (!tabHeader) return null;
 
 		const tabsEl = tabHeader.closest(".workspace-tabs");
-		if (!tabsEl) return;
+		if (!tabsEl) return null;
 
 		const sidebarEl = tabsEl.closest(
 			".mod-left-split, .mod-right-split"
 		);
-		if (!sidebarEl) return;
+		if (!sidebarEl) return null;
 
 		const side = sidebarEl.classList.contains("mod-left-split")
 			? "left"
 			: "right";
 		const split = this.getSplit(side);
-		if (!split || split.children.length <= 1) return;
+		if (!split || split.children.length <= 1) return null;
 
-		// Find which section this tab header belongs to
 		const sectionIndex = split.children.findIndex(
 			(s) => s.containerEl === tabsEl
 		);
-		if (sectionIndex === -1) return;
+		if (sectionIndex === -1) return null;
 
-		const isFocused = this.focusedSide === side;
-
-		// Find which leaf was clicked by matching tab header index
 		const section = split.children[sectionIndex];
 		const tabHeaderContainer = tabsEl.querySelector(
 			".workspace-tab-header-container"
@@ -96,6 +204,16 @@ export default class FocusedSidebarPlugin extends Plugin {
 				? section.children[tabIndex]
 				: null;
 
+		return { side, split, sectionIndex, clickedLeaf };
+	}
+
+	private maybeAddFocusItem(menu: Menu, evt: MouseEvent): void {
+		const hit = this.resolveTabHit(evt);
+		if (!hit) return;
+
+		const { side, split, sectionIndex, clickedLeaf } = hit;
+		const isFocused = this.focusedSide === side;
+
 		menu.addSeparator();
 		menu.addItem((item) => {
 			item.setTitle(isFocused ? "Unfocus sidebar" : "Focus this section")
@@ -106,7 +224,6 @@ export default class FocusedSidebarPlugin extends Plugin {
 					} else {
 						this.focusSection(side, split, sectionIndex);
 					}
-					// Activate the clicked leaf so the tab becomes visible
 					if (clickedLeaf) {
 						this.app.workspace.setActiveLeaf(clickedLeaf, {
 							focus: true,
@@ -165,9 +282,11 @@ export default class FocusedSidebarPlugin extends Plugin {
 			if (i === sectionIndex) {
 				section.dimension = 100;
 				section.containerEl.removeClass(COLLAPSED_CLASS);
+				section.containerEl.addClass(TARGET_CLASS);
 			} else {
 				section.dimension = 0;
 				section.containerEl.addClass(COLLAPSED_CLASS);
+				section.containerEl.removeClass(TARGET_CLASS);
 			}
 		});
 
@@ -194,6 +313,7 @@ export default class FocusedSidebarPlugin extends Plugin {
 		sections.forEach((section, i) => {
 			section.dimension = saved[i] ?? fallback;
 			section.containerEl.removeClass(COLLAPSED_CLASS);
+			section.containerEl.removeClass(TARGET_CLASS);
 		});
 
 		this.applyLayout(split);
