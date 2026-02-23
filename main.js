@@ -1,3 +1,4 @@
+"use strict";
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
@@ -83,6 +84,10 @@ var FocusedSidebarSettingTab = class extends import_obsidian.PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
+    containerEl.createEl("p", {
+      text: 'Collapse all sidebar sections except one. Double-click a tab header, right-click for "Focus this section," or use the command palette.',
+      cls: "setting-item-description"
+    });
     new import_obsidian.Setting(containerEl).setName("Indicator style").setDesc("How the focused section's tab is highlighted").addDropdown(
       (dropdown) => dropdown.addOptions(STYLE_DESCRIPTIONS).setValue(this.plugin.settings.indicatorStyle).onChange(async (value) => {
         this.plugin.settings.indicatorStyle = value;
@@ -147,7 +152,22 @@ var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
       name: "Toggle focused sidebar",
       callback: () => this.toggleFocus()
     });
-    this.addRibbonIcon("maximize", "Toggle focused sidebar", () => {
+    this.addCommand({
+      id: "focus-left-sidebar",
+      name: "Focus left sidebar",
+      callback: () => this.toggleFocusSide("left")
+    });
+    this.addCommand({
+      id: "focus-right-sidebar",
+      name: "Focus right sidebar",
+      callback: () => this.toggleFocusSide("right")
+    });
+    this.addCommand({
+      id: "cycle-focused-section",
+      name: "Cycle to next section",
+      callback: () => this.cycleFocus()
+    });
+    this.addRibbonIcon("panel-left", "Toggle focused sidebar", () => {
       this.toggleFocus();
     });
     this.patchMenu();
@@ -312,6 +332,37 @@ var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
     const activeIndex = this.findActiveSectionIndex(split);
     this.focusSection(side, split, activeIndex);
   }
+  toggleFocusSide(side) {
+    const split = this.getSplit(side);
+    if (!split) {
+      new import_obsidian2.Notice("No sidebar found.");
+      return;
+    }
+    const sections = split.children;
+    if (sections.length <= 1) {
+      new import_obsidian2.Notice("Sidebar has only one section.");
+      return;
+    }
+    if (this.focusedSide === side) {
+      this.unfocus();
+      return;
+    }
+    const activeIndex = this.findActiveSectionIndex(split);
+    this.focusSection(side, split, activeIndex);
+  }
+  cycleFocus() {
+    if (!this.focusedSide) {
+      new import_obsidian2.Notice("No section is focused.");
+      return;
+    }
+    const split = this.getSplit(this.focusedSide);
+    if (!split || split.children.length <= 1) return;
+    const currentIndex = split.children.findIndex(
+      (s) => s.containerEl.hasClass(TARGET_CLASS)
+    );
+    const nextIndex = (currentIndex + 1) % split.children.length;
+    this.focusSection(this.focusedSide, split, nextIndex);
+  }
   focusSection(side, split, sectionIndex) {
     const sections = split.children;
     if (sectionIndex < 0 || sectionIndex >= sections.length) return;
@@ -329,10 +380,12 @@ var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
         section.dimension = 100;
         section.containerEl.removeClass(COLLAPSED_CLASS);
         section.containerEl.addClass(TARGET_CLASS);
+        section.containerEl.removeAttribute("aria-hidden");
       } else {
         section.dimension = 0;
         section.containerEl.addClass(COLLAPSED_CLASS);
         section.containerEl.removeClass(TARGET_CLASS);
+        section.containerEl.setAttribute("aria-hidden", "true");
       }
     });
     this.applyLayout(split, false);
@@ -356,6 +409,7 @@ var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
       section.dimension = (_a = saved[i]) != null ? _a : fallback;
       section.containerEl.removeClass(COLLAPSED_CLASS);
       section.containerEl.removeClass(TARGET_CLASS);
+      section.containerEl.removeAttribute("aria-hidden");
     });
     this.applyLayout(split);
     this.savedDimensions.delete(side);

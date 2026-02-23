@@ -36,6 +36,11 @@ export class FocusedSidebarSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
+		containerEl.createEl("p", {
+			text: "Collapse all sidebar sections except one. Double-click a tab header, right-click for \"Focus this section,\" or use the command palette.",
+			cls: "setting-item-description",
+		});
+
 		new Setting(containerEl)
 			.setName("Indicator style")
 			.setDesc("How the focused section's tab is highlighted")

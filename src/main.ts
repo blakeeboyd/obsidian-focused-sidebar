@@ -60,7 +60,25 @@ export default class FocusedSidebarPlugin extends Plugin {
 			callback: () => this.toggleFocus(),
 		});
 
-		this.addRibbonIcon("maximize", "Toggle focused sidebar", () => {
+		this.addCommand({
+			id: "focus-left-sidebar",
+			name: "Focus left sidebar",
+			callback: () => this.toggleFocusSide("left"),
+		});
+
+		this.addCommand({
+			id: "focus-right-sidebar",
+			name: "Focus right sidebar",
+			callback: () => this.toggleFocusSide("right"),
+		});
+
+		this.addCommand({
+			id: "cycle-focused-section",
+			name: "Cycle to next section",
+			callback: () => this.cycleFocus(),
+		});
+
+		this.addRibbonIcon("panel-left", "Toggle focused sidebar", () => {
 			this.toggleFocus();
 		});
 
@@ -276,6 +294,44 @@ export default class FocusedSidebarPlugin extends Plugin {
 		this.focusSection(side, split, activeIndex);
 	}
 
+	private toggleFocusSide(side: Side): void {
+		const split = this.getSplit(side);
+		if (!split) {
+			new Notice("No sidebar found.");
+			return;
+		}
+
+		const sections = split.children;
+		if (sections.length <= 1) {
+			new Notice("Sidebar has only one section.");
+			return;
+		}
+
+		if (this.focusedSide === side) {
+			this.unfocus();
+			return;
+		}
+
+		const activeIndex = this.findActiveSectionIndex(split);
+		this.focusSection(side, split, activeIndex);
+	}
+
+	private cycleFocus(): void {
+		if (!this.focusedSide) {
+			new Notice("No section is focused.");
+			return;
+		}
+
+		const split = this.getSplit(this.focusedSide);
+		if (!split || split.children.length <= 1) return;
+
+		const currentIndex = split.children.findIndex(
+			(s) => s.containerEl.hasClass(TARGET_CLASS)
+		);
+		const nextIndex = (currentIndex + 1) % split.children.length;
+		this.focusSection(this.focusedSide, split, nextIndex);
+	}
+
 	private focusSection(
 		side: Side,
 		split: InternalSidedock,
@@ -305,10 +361,12 @@ export default class FocusedSidebarPlugin extends Plugin {
 				section.dimension = 100;
 				section.containerEl.removeClass(COLLAPSED_CLASS);
 				section.containerEl.addClass(TARGET_CLASS);
+				section.containerEl.removeAttribute("aria-hidden");
 			} else {
 				section.dimension = 0;
 				section.containerEl.addClass(COLLAPSED_CLASS);
 				section.containerEl.removeClass(TARGET_CLASS);
+				section.containerEl.setAttribute("aria-hidden", "true");
 			}
 		});
 
@@ -336,6 +394,7 @@ export default class FocusedSidebarPlugin extends Plugin {
 			section.dimension = saved[i] ?? fallback;
 			section.containerEl.removeClass(COLLAPSED_CLASS);
 			section.containerEl.removeClass(TARGET_CLASS);
+			section.containerEl.removeAttribute("aria-hidden");
 		});
 
 		this.applyLayout(split);

@@ -7,45 +7,50 @@
 	overflow: hidden !important;
 }
 
+/* ── Transition ─────────────────────────────────────────── */
+body.focused-sidebar-active .workspace-tabs {
+	transition: max-height 150ms ease-out, padding 150ms ease-out;
+}
+
 /* ── Resolved color ──────────────────────────────────── */
 /* --focused-sidebar-color and --focused-sidebar-color-rgb are always
    set on body by the plugin (custom pick or resolved accent color).   */
-.focused-sidebar-target .workspace-tab-header.is-active {
+body.focused-sidebar-active .focused-sidebar-target .workspace-tab-header.is-active {
 	--_fs-color: var(--focused-sidebar-color);
 	--_fs-rgb: var(--focused-sidebar-color-rgb);
 }
 
 /* Icon gets the indicator color (except for button style, which only colors the background) */
-body:not([data-focused-sidebar-style="button"])
+body.focused-sidebar-active:not([data-focused-sidebar-style="button"])
 	.focused-sidebar-target .workspace-tab-header.is-active .workspace-tab-header-inner-icon,
-body:not([data-focused-sidebar-style="button"])
+body.focused-sidebar-active:not([data-focused-sidebar-style="button"])
 	.focused-sidebar-target .workspace-tab-header.is-active .workspace-tab-header-inner-icon svg {
-	color: var(--_fs-color) !important;
+	color: var(--_fs-color);
 }
 
 /* ── Style: highlight (background tint + underline) ──── */
-body[data-focused-sidebar-style="highlight"]
+body.focused-sidebar-active[data-focused-sidebar-style="highlight"]
 	.focused-sidebar-target .workspace-tab-header.is-active,
-body[data-focused-sidebar-style="highlight"]
+body.focused-sidebar-active[data-focused-sidebar-style="highlight"]
 	.focused-sidebar-target .workspace-tab-header.is-active:hover {
-	background-color: rgba(var(--_fs-rgb), 0.15) !important;
+	background-color: rgba(var(--_fs-rgb), 0.15);
 	box-shadow: inset 0 -3px 0 0 var(--_fs-color);
 	border-radius: 4px 4px 0 0;
 }
 
 /* ── Style: underline (bottom border only) ───────────── */
-body[data-focused-sidebar-style="underline"]
+body.focused-sidebar-active[data-focused-sidebar-style="underline"]
 	.focused-sidebar-target .workspace-tab-header.is-active {
 	box-shadow: inset 0 -3px 0 0 var(--_fs-color);
 }
 
 /* ── Style: dot (colored dot above icon) ─────────────── */
-body[data-focused-sidebar-style="dot"]
+body.focused-sidebar-active[data-focused-sidebar-style="dot"]
 	.focused-sidebar-target .workspace-tab-header.is-active .workspace-tab-header-inner-icon {
 	position: relative;
 }
 
-body[data-focused-sidebar-style="dot"]
+body.focused-sidebar-active[data-focused-sidebar-style="dot"]
 	.focused-sidebar-target .workspace-tab-header.is-active .workspace-tab-header-inner-icon::after {
 	content: "";
 	position: absolute;
@@ -59,7 +64,7 @@ body[data-focused-sidebar-style="dot"]
 }
 
 /* ── Style: glow (soft glow behind icon) ─────────────── */
-body[data-focused-sidebar-style="glow"]
+body.focused-sidebar-active[data-focused-sidebar-style="glow"]
 	.focused-sidebar-target .workspace-tab-header.is-active .workspace-tab-header-inner-icon {
 	filter: drop-shadow(0 0 6px var(--_fs-color)) drop-shadow(0 0 12px rgba(var(--_fs-rgb), 0.4));
 }
@@ -68,10 +73,10 @@ body[data-focused-sidebar-style="glow"]
 /* No extra rules needed — the icon color rule above handles it. */
 
 /* ── Style: button (colored background, default icon) ── */
-body[data-focused-sidebar-style="button"]
+body.focused-sidebar-active[data-focused-sidebar-style="button"]
 	.focused-sidebar-target .workspace-tab-header.is-active,
-body[data-focused-sidebar-style="button"]
+body.focused-sidebar-active[data-focused-sidebar-style="button"]
 	.focused-sidebar-target .workspace-tab-header.is-active:hover {
-	background-color: rgba(var(--_fs-rgb), 0.25) !important;
+	background-color: rgba(var(--_fs-rgb), 0.25);
 	border-radius: 4px;
 }
