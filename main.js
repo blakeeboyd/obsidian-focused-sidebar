@@ -152,6 +152,7 @@ var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
     });
     this.patchMenu();
     this.registerDblClick();
+    this.registerLayoutChange();
   }
   onunload() {
     if (this.focusedSide) {
@@ -208,6 +209,7 @@ var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
     this.dblClickHandler = (evt) => {
       const hit = this.resolveTabHit(evt);
       if (!hit) return;
+      evt.stopPropagation();
       const { side, split, sectionIndex, clickedLeaf } = hit;
       const isFocused = this.focusedSide === side;
       if (isFocused) {
@@ -220,6 +222,19 @@ var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
       }
     };
     document.addEventListener("dblclick", this.dblClickHandler, true);
+  }
+  registerLayoutChange() {
+    this.registerEvent(
+      this.app.workspace.on("layout-change", () => {
+        if (!this.focusedSide) return;
+        const split = this.getSplit(this.focusedSide);
+        if (!split) return;
+        const saved = this.savedDimensions.get(this.focusedSide);
+        if (saved && split.children.length !== saved.length) {
+          this.unfocus();
+        }
+      })
+    );
   }
   /**
    * Given a mouse event on a sidebar tab header, resolve which side,
@@ -299,6 +314,7 @@ var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
   }
   focusSection(side, split, sectionIndex) {
     const sections = split.children;
+    if (sectionIndex < 0 || sectionIndex >= sections.length) return;
     if (this.focusedSide && this.focusedSide !== side) {
       this.restoreDimensions(this.focusedSide);
     }
@@ -319,7 +335,7 @@ var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
         section.containerEl.removeClass(TARGET_CLASS);
       }
     });
-    this.applyLayout(split);
+    this.applyLayout(split, false);
     this.focusedSide = side;
     document.body.addClass(ACTIVE_CLASS);
   }
@@ -344,16 +360,18 @@ var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
     this.applyLayout(split);
     this.savedDimensions.delete(side);
   }
-  applyLayout(split) {
+  applyLayout(split, persist = true) {
     if (typeof split.recomputeChildrenDimensions === "function") {
       split.recomputeChildrenDimensions();
     }
-    this.app.workspace.requestSaveLayout();
+    if (persist) {
+      this.app.workspace.requestSaveLayout();
+    }
   }
   resolveSide() {
-    const activeLeaf = this.app.workspace.activeLeaf;
-    if (activeLeaf) {
-      const root = activeLeaf.getRoot();
+    const leaf = this.app.workspace.getMostRecentLeaf();
+    if (leaf) {
+      const root = leaf.getRoot();
       if (root === this.app.workspace.leftSplit) return "left";
       if (root === this.app.workspace.rightSplit) return "right";
     }
@@ -361,17 +379,15 @@ var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
   }
   getSplit(side) {
     const split = side === "left" ? this.app.workspace.leftSplit : this.app.workspace.rightSplit;
+    if (!split) return null;
     return split;
   }
   findActiveSectionIndex(split) {
-    const activeLeaf = this.app.workspace.activeLeaf;
-    if (activeLeaf) {
-      const idx = this.findSectionIndexForLeaf(split, activeLeaf);
-      if (idx !== -1) return idx;
-    }
-    const recent = this.app.workspace.getMostRecentLeaf(split);
-    if (recent) {
-      const idx = this.findSectionIndexForLeaf(split, recent);
+    const leaf = this.app.workspace.getMostRecentLeaf(
+      split
+    );
+    if (leaf) {
+      const idx = this.findSectionIndexForLeaf(split, leaf);
       if (idx !== -1) return idx;
     }
     return 0;

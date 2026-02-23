@@ -1,12 +1,13 @@
-import { Menu, Notice, Plugin, WorkspaceLeaf } from "obsidian";
+import { Menu, Notice, Plugin, WorkspaceLeaf, WorkspaceSidedock } from "obsidian";
 import { around } from "monkey-around";
-import { InternalSidedock, InternalWorkspaceTabs } from "./types";
+import { InternalSidedock } from "./types";
 import {
 	DEFAULT_SETTINGS,
 	FocusedSidebarSettings,
 	FocusedSidebarSettingTab,
-	IndicatorStyle,
 } from "./settings";
+
+type Side = "left" | "right";
 
 const COLLAPSED_CLASS = "focused-sidebar-collapsed";
 const ACTIVE_CLASS = "focused-sidebar-active";
@@ -45,7 +46,7 @@ function getAccentColor(): string {
 export default class FocusedSidebarPlugin extends Plugin {
 	settings: FocusedSidebarSettings = DEFAULT_SETTINGS;
 	private savedDimensions: Map<string, number[]> = new Map();
-	private focusedSide: string | null = null;
+	private focusedSide: Side | null = null;
 	private unpatchMenu: (() => void) | null = null;
 	private dblClickHandler: ((evt: MouseEvent) => void) | null = null;
 
@@ -65,6 +66,7 @@ export default class FocusedSidebarPlugin extends Plugin {
 
 		this.patchMenu();
 		this.registerDblClick();
+		this.registerLayoutChange();
 	}
 
 	onunload(): void {
@@ -133,6 +135,9 @@ export default class FocusedSidebarPlugin extends Plugin {
 			const hit = this.resolveTabHit(evt);
 			if (!hit) return;
 
+			// Prevent Obsidian's default double-click behavior (e.g. rename)
+			evt.stopPropagation();
+
 			const { side, split, sectionIndex, clickedLeaf } = hit;
 			const isFocused = this.focusedSide === side;
 
@@ -151,13 +156,27 @@ export default class FocusedSidebarPlugin extends Plugin {
 		document.addEventListener("dblclick", this.dblClickHandler, true);
 	}
 
+	private registerLayoutChange(): void {
+		this.registerEvent(
+			this.app.workspace.on("layout-change", () => {
+				if (!this.focusedSide) return;
+				const split = this.getSplit(this.focusedSide);
+				if (!split) return;
+				const saved = this.savedDimensions.get(this.focusedSide);
+				if (saved && split.children.length !== saved.length) {
+					this.unfocus();
+				}
+			})
+		);
+	}
+
 	/**
 	 * Given a mouse event on a sidebar tab header, resolve which side,
 	 * section, and leaf were targeted. Returns null if the click wasn't
 	 * on a sidebar tab header or the sidebar has only one section.
 	 */
 	private resolveTabHit(evt: MouseEvent): {
-		side: string;
+		side: Side;
 		split: InternalSidedock;
 		sectionIndex: number;
 		clickedLeaf: WorkspaceLeaf | null;
@@ -258,11 +277,12 @@ export default class FocusedSidebarPlugin extends Plugin {
 	}
 
 	private focusSection(
-		side: string,
+		side: Side,
 		split: InternalSidedock,
 		sectionIndex: number
 	): void {
 		const sections = split.children;
+		if (sectionIndex < 0 || sectionIndex >= sections.length) return;
 
 		// Restore other side if focused
 		if (this.focusedSide && this.focusedSide !== side) {
@@ -277,7 +297,9 @@ export default class FocusedSidebarPlugin extends Plugin {
 			);
 		}
 
-		// Focus: target section gets everything, others collapse
+		// Focus: target section gets everything, others collapse.
+		// Pass persist=false so collapsed dimensions don't get saved to
+		// the workspace file — prevents broken sidebar on crash.
 		sections.forEach((section, i) => {
 			if (i === sectionIndex) {
 				section.dimension = 100;
@@ -290,7 +312,7 @@ export default class FocusedSidebarPlugin extends Plugin {
 			}
 		});
 
-		this.applyLayout(split);
+		this.applyLayout(split, false);
 		this.focusedSide = side;
 		document.body.addClass(ACTIVE_CLASS);
 	}
@@ -302,7 +324,7 @@ export default class FocusedSidebarPlugin extends Plugin {
 		document.body.removeClass(ACTIVE_CLASS);
 	}
 
-	private restoreDimensions(side: string): void {
+	private restoreDimensions(side: Side): void {
 		const saved = this.savedDimensions.get(side);
 		const split = this.getSplit(side);
 		if (!saved || !split) return;
@@ -320,46 +342,42 @@ export default class FocusedSidebarPlugin extends Plugin {
 		this.savedDimensions.delete(side);
 	}
 
-	private applyLayout(split: InternalSidedock): void {
+	private applyLayout(split: InternalSidedock, persist = true): void {
 		if (typeof split.recomputeChildrenDimensions === "function") {
 			split.recomputeChildrenDimensions();
 		}
-		this.app.workspace.requestSaveLayout();
+		if (persist) {
+			this.app.workspace.requestSaveLayout();
+		}
 	}
 
-	private resolveSide(): string {
-		const activeLeaf = this.app.workspace.activeLeaf;
-		if (activeLeaf) {
-			const root = activeLeaf.getRoot();
+	private resolveSide(): Side {
+		const leaf = this.app.workspace.getMostRecentLeaf();
+		if (leaf) {
+			const root = leaf.getRoot();
 			if (root === this.app.workspace.leftSplit) return "left";
 			if (root === this.app.workspace.rightSplit) return "right";
 		}
 		return "right";
 	}
 
-	private getSplit(side: string): InternalSidedock | null {
+	private getSplit(side: Side): InternalSidedock | null {
 		const split =
 			side === "left"
 				? this.app.workspace.leftSplit
 				: this.app.workspace.rightSplit;
+		if (!split) return null;
 		return split as unknown as InternalSidedock;
 	}
 
 	private findActiveSectionIndex(split: InternalSidedock): number {
-		const activeLeaf = this.app.workspace.activeLeaf;
-
-		if (activeLeaf) {
-			const idx = this.findSectionIndexForLeaf(split, activeLeaf);
+		const leaf = this.app.workspace.getMostRecentLeaf(
+			split as unknown as WorkspaceSidedock
+		);
+		if (leaf) {
+			const idx = this.findSectionIndexForLeaf(split, leaf);
 			if (idx !== -1) return idx;
 		}
-
-		// Fallback: most recent leaf in this split
-		const recent = this.app.workspace.getMostRecentLeaf(split as any);
-		if (recent) {
-			const idx = this.findSectionIndexForLeaf(split, recent);
-			if (idx !== -1) return idx;
-		}
-
 		return 0;
 	}
 
