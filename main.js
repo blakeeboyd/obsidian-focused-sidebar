@@ -152,6 +152,7 @@ var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
     this.dblClickHandler = null;
     this.statusBarEl = null;
     this.ribbonIconEl = null;
+    this.lastInteractedSide = "left";
   }
   async onload() {
     await this.loadSettings();
@@ -210,11 +211,11 @@ var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
       DEFAULT_SETTINGS,
       await this.loadData()
     );
-    this.applyStyleAttrs();
+    if (this.focusedSide) this.applyStyleAttrs();
   }
   async saveSettings() {
     await this.saveData(this.settings);
-    this.applyStyleAttrs();
+    if (this.focusedSide) this.applyStyleAttrs();
   }
   /** Push settings into CSS custom properties and a data attribute on body. */
   applyStyleAttrs() {
@@ -246,6 +247,7 @@ var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
       if (!hit) return;
       evt.stopPropagation();
       const { side, split, sectionIndex, clickedLeaf } = hit;
+      this.lastInteractedSide = side;
       const isFocused = this.focusedSide === side;
       if (isFocused) {
         this.unfocus();
@@ -311,6 +313,7 @@ var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
     const hit = this.resolveTabHit(evt);
     if (!hit) return;
     const { side, split, sectionIndex, clickedLeaf } = hit;
+    this.lastInteractedSide = side;
     const isFocused = this.focusedSide === side;
     menu.addSeparator();
     menu.addItem((item) => {
@@ -405,6 +408,7 @@ var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
     });
     this.applyLayout(split, false);
     this.focusedSide = side;
+    this.applyStyleAttrs();
     document.body.addClass(ACTIVE_CLASS);
     this.updateStatusBar(side);
   }
@@ -413,6 +417,7 @@ var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
     this.restoreDimensions(this.focusedSide);
     this.focusedSide = null;
     document.body.removeClass(ACTIVE_CLASS);
+    this.removeStyleAttrs();
     this.updateStatusBar(null);
   }
   restoreDimensions(side) {
@@ -467,7 +472,7 @@ var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
       if (root === this.app.workspace.leftSplit) return "left";
       if (root === this.app.workspace.rightSplit) return "right";
     }
-    return "right";
+    return this.lastInteractedSide;
   }
   getSplit(side) {
     const split = side === "left" ? this.app.workspace.leftSplit : this.app.workspace.rightSplit;

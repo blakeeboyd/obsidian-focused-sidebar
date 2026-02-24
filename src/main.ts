@@ -51,6 +51,7 @@ export default class FocusedSidebarPlugin extends Plugin {
 	private dblClickHandler: ((evt: MouseEvent) => void) | null = null;
 	private statusBarEl: HTMLElement | null = null;
 	private ribbonIconEl: HTMLElement | null = null;
+	private lastInteractedSide: Side = "left";
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
@@ -118,12 +119,12 @@ export default class FocusedSidebarPlugin extends Plugin {
 			DEFAULT_SETTINGS,
 			await this.loadData()
 		);
-		this.applyStyleAttrs();
+		if (this.focusedSide) this.applyStyleAttrs();
 	}
 
 	async saveSettings(): Promise<void> {
 		await this.saveData(this.settings);
-		this.applyStyleAttrs();
+		if (this.focusedSide) this.applyStyleAttrs();
 	}
 
 	/** Push settings into CSS custom properties and a data attribute on body. */
@@ -166,6 +167,7 @@ export default class FocusedSidebarPlugin extends Plugin {
 			evt.stopPropagation();
 
 			const { side, split, sectionIndex, clickedLeaf } = hit;
+			this.lastInteractedSide = side;
 			const isFocused = this.focusedSide === side;
 
 			if (isFocused) {
@@ -258,6 +260,7 @@ export default class FocusedSidebarPlugin extends Plugin {
 		if (!hit) return;
 
 		const { side, split, sectionIndex, clickedLeaf } = hit;
+		this.lastInteractedSide = side;
 		const isFocused = this.focusedSide === side;
 
 		menu.addSeparator();
@@ -381,6 +384,7 @@ export default class FocusedSidebarPlugin extends Plugin {
 
 		this.applyLayout(split, false);
 		this.focusedSide = side;
+		this.applyStyleAttrs();
 		document.body.addClass(ACTIVE_CLASS);
 		this.updateStatusBar(side);
 	}
@@ -390,6 +394,7 @@ export default class FocusedSidebarPlugin extends Plugin {
 		this.restoreDimensions(this.focusedSide);
 		this.focusedSide = null;
 		document.body.removeClass(ACTIVE_CLASS);
+		this.removeStyleAttrs();
 		this.updateStatusBar(null);
 	}
 
@@ -451,7 +456,7 @@ export default class FocusedSidebarPlugin extends Plugin {
 			if (root === this.app.workspace.leftSplit) return "left";
 			if (root === this.app.workspace.rightSplit) return "right";
 		}
-		return "right";
+		return this.lastInteractedSide;
 	}
 
 	private getSplit(side: Side): InternalSidedock | null {
