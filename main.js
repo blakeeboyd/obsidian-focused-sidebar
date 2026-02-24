@@ -67,7 +67,7 @@ var DEFAULT_SETTINGS = {
   indicatorStyle: "underline",
   useCustomColor: false,
   customColor: "#7f6df2",
-  showRibbonIcon: true
+  showRibbonIcon: false
 };
 var STYLE_DESCRIPTIONS = {
   underline: "Bottom border only",
@@ -85,7 +85,7 @@ var FocusedSidebarSettingTab = class extends import_obsidian.PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
     containerEl.createEl("p", {
-      text: 'Collapse all sidebar sections except one. Double-click a tab header, right-click for "Focus this section," or use the command palette.',
+      text: 'Collapse all sidebar sections except one. Double-click a tab header, right-click for "Focus section," or use the command palette.',
       cls: "setting-item-description"
     });
     new import_obsidian.Setting(containerEl).setName("Show ribbon icon").setDesc("Show a toggle button in the left ribbon").addToggle(

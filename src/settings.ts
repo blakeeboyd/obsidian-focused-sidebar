@@ -14,7 +14,7 @@ export const DEFAULT_SETTINGS: FocusedSidebarSettings = {
 	indicatorStyle: "underline",
 	useCustomColor: false,
 	customColor: "#7f6df2",
-	showRibbonIcon: true,
+	showRibbonIcon: false,
 };
 
 const STYLE_DESCRIPTIONS: Record<IndicatorStyle, string> = {
@@ -38,7 +38,7 @@ export class FocusedSidebarSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		containerEl.createEl("p", {
-			text: "Collapse all sidebar sections except one. Double-click a tab header, right-click for \"Focus this section,\" or use the command palette.",
+			text: "Collapse all sidebar sections except one. Double-click a tab header, right-click for \"Focus section,\" or use the command palette.",
 			cls: "setting-item-description",
 		});
 
