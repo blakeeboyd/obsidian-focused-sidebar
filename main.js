@@ -66,7 +66,8 @@ var import_obsidian = require("obsidian");
 var DEFAULT_SETTINGS = {
   indicatorStyle: "highlight",
   useCustomColor: false,
-  customColor: "#7f6df2"
+  customColor: "#7f6df2",
+  showRibbonIcon: true
 };
 var STYLE_DESCRIPTIONS = {
   highlight: "Background tint + underline",
@@ -88,6 +89,13 @@ var FocusedSidebarSettingTab = class extends import_obsidian.PluginSettingTab {
       text: 'Collapse all sidebar sections except one. Double-click a tab header, right-click for "Focus this section," or use the command palette.',
       cls: "setting-item-description"
     });
+    new import_obsidian.Setting(containerEl).setName("Show ribbon icon").setDesc("Show a toggle button in the left ribbon").addToggle(
+      (toggle) => toggle.setValue(this.plugin.settings.showRibbonIcon).onChange(async (value) => {
+        this.plugin.settings.showRibbonIcon = value;
+        await this.plugin.saveSettings();
+        this.plugin.updateRibbonIcon();
+      })
+    );
     new import_obsidian.Setting(containerEl).setName("Indicator style").setDesc("How the focused section's tab is highlighted").addDropdown(
       (dropdown) => dropdown.addOptions(STYLE_DESCRIPTIONS).setValue(this.plugin.settings.indicatorStyle).onChange(async (value) => {
         this.plugin.settings.indicatorStyle = value;
@@ -143,6 +151,8 @@ var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
     this.focusedSide = null;
     this.unpatchMenu = null;
     this.dblClickHandler = null;
+    this.statusBarEl = null;
+    this.ribbonIconEl = null;
   }
   async onload() {
     await this.loadSettings();
@@ -167,9 +177,15 @@ var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
       name: "Cycle to next section",
       callback: () => this.cycleFocus()
     });
-    this.addRibbonIcon("panel-left", "Toggle focused sidebar", () => {
-      this.toggleFocus();
-    });
+    if (this.settings.showRibbonIcon) {
+      this.ribbonIconEl = this.addRibbonIcon(
+        "panel-left",
+        "Toggle focused sidebar",
+        () => this.toggleFocus()
+      );
+    }
+    this.statusBarEl = this.addStatusBarItem();
+    this.statusBarEl.style.display = "none";
     this.patchMenu();
     this.registerDblClick();
     this.registerLayoutChange();
@@ -391,12 +407,14 @@ var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
     this.applyLayout(split, false);
     this.focusedSide = side;
     document.body.addClass(ACTIVE_CLASS);
+    this.updateStatusBar(side);
   }
   unfocus() {
     if (!this.focusedSide) return;
     this.restoreDimensions(this.focusedSide);
     this.focusedSide = null;
     document.body.removeClass(ACTIVE_CLASS);
+    this.updateStatusBar(null);
   }
   restoreDimensions(side) {
     const saved = this.savedDimensions.get(side);
@@ -420,6 +438,27 @@ var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
     }
     if (persist) {
       this.app.workspace.requestSaveLayout();
+    }
+  }
+  updateRibbonIcon() {
+    if (this.settings.showRibbonIcon && !this.ribbonIconEl) {
+      this.ribbonIconEl = this.addRibbonIcon(
+        "panel-left",
+        "Toggle focused sidebar",
+        () => this.toggleFocus()
+      );
+    } else if (!this.settings.showRibbonIcon && this.ribbonIconEl) {
+      this.ribbonIconEl.remove();
+      this.ribbonIconEl = null;
+    }
+  }
+  updateStatusBar(side) {
+    if (!this.statusBarEl) return;
+    if (side) {
+      this.statusBarEl.setText(`Focused: ${side}`);
+      this.statusBarEl.style.display = "";
+    } else {
+      this.statusBarEl.style.display = "none";
     }
   }
   resolveSide() {

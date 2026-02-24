@@ -4,15 +4,41 @@ An Obsidian plugin that toggles any sidebar section to fill the full sidebar hei
 
 Obsidian splits each sidebar into three fixed sections. When you want one section to have room to breathe, this plugin collapses the others and gives it the full height. Toggle again to restore the original layout.
 
+| Before | After |
+|--------|-------|
+| ![Three cramped sidebar sections](screenshots/before.png) | ![One section focused at full height](screenshots/after.png) |
+
+Right-click any tab header to focus its section:
+
+![Context menu with "Focus this section"](screenshots/context-menu.png)
+
 ## Usage
 
-Three ways to toggle:
+Multiple ways to focus:
 
-- **Command palette:** "Toggle focused sidebar"
-- **Ribbon icon:** Click the maximize icon in the left ribbon
-- **Right-click:** Right-click any sidebar tab header and choose "Focus this section" (works on both active and inactive tabs)
+- **Command palette:** "Toggle focused sidebar" (auto-detects left or right based on where you're working)
+- **Ribbon icon:** Click the sidebar icon in the left ribbon
+- **Right-click:** Right-click any sidebar tab header and choose "Focus this section"
+- **Double-click:** Double-click any sidebar tab header to focus its section
+- **Targeted commands:** "Focus left sidebar" and "Focus right sidebar" for direct control
+- **Cycle:** "Cycle to next section" steps through sections while focused
 
-The plugin auto-detects which sidebar (left or right) based on where you're working. Defaults to the right sidebar if focus is in the main editor.
+All commands can be bound to hotkeys in Settings > Hotkeys.
+
+## Settings
+
+- **Indicator style** — How the focused tab is highlighted. Six options:
+  - *Highlight* — Background tint + colored underline (default)
+  - *Underline* — Bottom border only
+  - *Dot* — Small colored dot above the icon
+  - *Glow* — Soft glow behind the icon
+  - *Icon only* — Icon color change, no background effect
+  - *Button* — Colored button background
+- **Show ribbon icon** — Toggle the sidebar icon in the left ribbon on or off
+- **Use custom color** — Override the theme's accent color with your own pick
+- **Custom color** — Color picker (appears when custom color is enabled)
+
+![Settings tab](screenshots/settings.png)
 
 ## How it works
 
@@ -21,6 +47,7 @@ The plugin saves the current section proportions, sets the target section to 100
 - Disabling the plugin restores normal layout automatically
 - Manually resizing while focused doesn't affect the saved proportions
 - Focused state is not persisted across restarts (starts in normal mode)
+- If you drag a pane to a new section while focused, focus mode exits gracefully
 
 ## Installation
 

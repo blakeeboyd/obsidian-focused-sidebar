@@ -49,6 +49,8 @@ export default class FocusedSidebarPlugin extends Plugin {
 	private focusedSide: Side | null = null;
 	private unpatchMenu: (() => void) | null = null;
 	private dblClickHandler: ((evt: MouseEvent) => void) | null = null;
+	private statusBarEl: HTMLElement | null = null;
+	private ribbonIconEl: HTMLElement | null = null;
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
@@ -78,9 +80,16 @@ export default class FocusedSidebarPlugin extends Plugin {
 			callback: () => this.cycleFocus(),
 		});
 
-		this.addRibbonIcon("panel-left", "Toggle focused sidebar", () => {
-			this.toggleFocus();
-		});
+		if (this.settings.showRibbonIcon) {
+			this.ribbonIconEl = this.addRibbonIcon(
+				"panel-left",
+				"Toggle focused sidebar",
+				() => this.toggleFocus()
+			);
+		}
+
+		this.statusBarEl = this.addStatusBarItem();
+		this.statusBarEl.style.display = "none";
 
 		this.patchMenu();
 		this.registerDblClick();
@@ -373,6 +382,7 @@ export default class FocusedSidebarPlugin extends Plugin {
 		this.applyLayout(split, false);
 		this.focusedSide = side;
 		document.body.addClass(ACTIVE_CLASS);
+		this.updateStatusBar(side);
 	}
 
 	private unfocus(): void {
@@ -380,6 +390,7 @@ export default class FocusedSidebarPlugin extends Plugin {
 		this.restoreDimensions(this.focusedSide);
 		this.focusedSide = null;
 		document.body.removeClass(ACTIVE_CLASS);
+		this.updateStatusBar(null);
 	}
 
 	private restoreDimensions(side: Side): void {
@@ -407,6 +418,29 @@ export default class FocusedSidebarPlugin extends Plugin {
 		}
 		if (persist) {
 			this.app.workspace.requestSaveLayout();
+		}
+	}
+
+	updateRibbonIcon(): void {
+		if (this.settings.showRibbonIcon && !this.ribbonIconEl) {
+			this.ribbonIconEl = this.addRibbonIcon(
+				"panel-left",
+				"Toggle focused sidebar",
+				() => this.toggleFocus()
+			);
+		} else if (!this.settings.showRibbonIcon && this.ribbonIconEl) {
+			this.ribbonIconEl.remove();
+			this.ribbonIconEl = null;
+		}
+	}
+
+	private updateStatusBar(side: Side | null): void {
+		if (!this.statusBarEl) return;
+		if (side) {
+			this.statusBarEl.setText(`Focused: ${side}`);
+			this.statusBarEl.style.display = "";
+		} else {
+			this.statusBarEl.style.display = "none";
 		}
 	}
 

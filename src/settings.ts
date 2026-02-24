@@ -7,12 +7,14 @@ export interface FocusedSidebarSettings {
 	indicatorStyle: IndicatorStyle;
 	useCustomColor: boolean;
 	customColor: string;
+	showRibbonIcon: boolean;
 }
 
 export const DEFAULT_SETTINGS: FocusedSidebarSettings = {
 	indicatorStyle: "highlight",
 	useCustomColor: false,
 	customColor: "#7f6df2",
+	showRibbonIcon: true,
 };
 
 const STYLE_DESCRIPTIONS: Record<IndicatorStyle, string> = {
@@ -40,6 +42,19 @@ export class FocusedSidebarSettingTab extends PluginSettingTab {
 			text: "Collapse all sidebar sections except one. Double-click a tab header, right-click for \"Focus this section,\" or use the command palette.",
 			cls: "setting-item-description",
 		});
+
+		new Setting(containerEl)
+			.setName("Show ribbon icon")
+			.setDesc("Show a toggle button in the left ribbon")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.showRibbonIcon)
+					.onChange(async (value) => {
+						this.plugin.settings.showRibbonIcon = value;
+						await this.plugin.saveSettings();
+						this.plugin.updateRibbonIcon();
+					})
+			);
 
 		new Setting(containerEl)
 			.setName("Indicator style")
