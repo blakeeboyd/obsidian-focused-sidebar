@@ -66,7 +66,7 @@ var import_obsidian = require("obsidian");
 var DEFAULT_SETTINGS = {
   indicatorStyle: "underline",
   useCustomColor: false,
-  customColor: "#7f6df2",
+  customColor: "#7440e4",
   showRibbonIcon: false
 };
 var STYLE_DESCRIPTIONS = {
@@ -116,6 +116,12 @@ var FocusedSidebarSettingTab = class extends import_obsidian.PluginSettingTab {
           this.plugin.settings.customColor = value;
           await this.plugin.saveSettings();
         })
+      ).addButton(
+        (button) => button.setButtonText("Reset").onClick(async () => {
+          this.plugin.settings.customColor = DEFAULT_SETTINGS.customColor;
+          await this.plugin.saveSettings();
+          this.display();
+        })
       );
     }
   }
@@ -130,8 +136,9 @@ function hexToRgb(hex) {
   const n = parseInt(h, 16);
   return `${n >> 16 & 255}, ${n >> 8 & 255}, ${n & 255}`;
 }
-function getAccentColor() {
-  const raw = getComputedStyle(document.body).getPropertyValue("--interactive-accent").trim();
+function getResolvedColor(property, fallback) {
+  const raw = getComputedStyle(document.body).getPropertyValue(property).trim();
+  if (!raw) return fallback;
   if (raw.startsWith("#")) return raw;
   const tmp = document.createElement("div");
   tmp.style.color = raw;
@@ -139,7 +146,7 @@ function getAccentColor() {
   const computed = getComputedStyle(tmp).color;
   tmp.remove();
   const m = computed.match(/(\d+)/g);
-  if (!m) return "#7f6df2";
+  if (!m) return fallback;
   return "#" + m.slice(0, 3).map((n) => parseInt(n).toString(16).padStart(2, "0")).join("");
 }
 var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
@@ -189,6 +196,7 @@ var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
     this.patchMenu();
     this.registerDblClick();
     this.registerLayoutChange();
+    this.registerCssChange();
   }
   onunload() {
     if (this.focusedSide) {
@@ -221,7 +229,7 @@ var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
   applyStyleAttrs() {
     const el = document.body;
     el.dataset.focusedSidebarStyle = this.settings.indicatorStyle;
-    const color = this.settings.useCustomColor ? this.settings.customColor : getAccentColor();
+    const color = this.settings.useCustomColor ? this.settings.customColor : getResolvedColor("--interactive-accent", "#7440e4");
     el.style.setProperty("--focused-sidebar-color", color);
     el.style.setProperty("--focused-sidebar-color-rgb", hexToRgb(color));
   }
@@ -259,6 +267,15 @@ var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
       }
     };
     document.addEventListener("dblclick", this.dblClickHandler, true);
+  }
+  registerCssChange() {
+    this.registerEvent(
+      this.app.workspace.on("css-change", () => {
+        if (this.focusedSide && !this.settings.useCustomColor) {
+          this.applyStyleAttrs();
+        }
+      })
+    );
   }
   registerLayoutChange() {
     this.registerEvent(

@@ -20,12 +20,12 @@ function hexToRgb(hex: string): string {
 	return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
 }
 
-/** Read the resolved accent color from the theme as a hex string. */
-function getAccentColor(): string {
+/** Resolve a CSS custom property to a hex color string. */
+function getResolvedColor(property: string, fallback: string): string {
 	const raw = getComputedStyle(document.body)
-		.getPropertyValue("--interactive-accent")
+		.getPropertyValue(property)
 		.trim();
-	// Could be hex, rgb(), or hsl() — normalise to hex via a throwaway element
+	if (!raw) return fallback;
 	if (raw.startsWith("#")) return raw;
 	const tmp = document.createElement("div");
 	tmp.style.color = raw;
@@ -33,7 +33,7 @@ function getAccentColor(): string {
 	const computed = getComputedStyle(tmp).color; // always "rgb(r, g, b)"
 	tmp.remove();
 	const m = computed.match(/(\d+)/g);
-	if (!m) return "#7f6df2"; // safe fallback
+	if (!m) return fallback;
 	return (
 		"#" +
 		m
@@ -95,6 +95,7 @@ export default class FocusedSidebarPlugin extends Plugin {
 		this.patchMenu();
 		this.registerDblClick();
 		this.registerLayoutChange();
+		this.registerCssChange();
 	}
 
 	onunload(): void {
@@ -134,7 +135,7 @@ export default class FocusedSidebarPlugin extends Plugin {
 
 		const color = this.settings.useCustomColor
 			? this.settings.customColor
-			: getAccentColor();
+			: getResolvedColor("--interactive-accent", "#7440e4");
 		el.style.setProperty("--focused-sidebar-color", color);
 		el.style.setProperty("--focused-sidebar-color-rgb", hexToRgb(color));
 	}
@@ -183,6 +184,16 @@ export default class FocusedSidebarPlugin extends Plugin {
 
 		// Capture phase so we fire before Obsidian's own handlers
 		document.addEventListener("dblclick", this.dblClickHandler, true);
+	}
+
+	private registerCssChange(): void {
+		this.registerEvent(
+			this.app.workspace.on("css-change", () => {
+				if (this.focusedSide && !this.settings.useCustomColor) {
+					this.applyStyleAttrs();
+				}
+			})
+		);
 	}
 
 	private registerLayoutChange(): void {

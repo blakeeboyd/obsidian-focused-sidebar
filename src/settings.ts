@@ -13,7 +13,7 @@ export interface FocusedSidebarSettings {
 export const DEFAULT_SETTINGS: FocusedSidebarSettings = {
 	indicatorStyle: "underline",
 	useCustomColor: false,
-	customColor: "#7f6df2",
+	customColor: "#7440e4",
 	showRibbonIcon: false,
 };
 
@@ -94,6 +94,16 @@ export class FocusedSidebarSettingTab extends PluginSettingTab {
 						.onChange(async (value) => {
 							this.plugin.settings.customColor = value;
 							await this.plugin.saveSettings();
+						})
+				)
+				.addButton((button) =>
+					button
+						.setButtonText("Reset")
+						.onClick(async () => {
+							this.plugin.settings.customColor =
+								DEFAULT_SETTINGS.customColor;
+							await this.plugin.saveSettings();
+							this.display();
 						})
 				);
 		}
