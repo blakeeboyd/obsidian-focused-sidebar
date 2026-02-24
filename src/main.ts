@@ -262,7 +262,7 @@ export default class FocusedSidebarPlugin extends Plugin {
 
 		menu.addSeparator();
 		menu.addItem((item) => {
-			item.setTitle(isFocused ? "Unfocus sidebar" : "Focus this section")
+			item.setTitle(isFocused ? "Unfocus section" : "Focus section")
 				.setIcon(isFocused ? "minimize" : "maximize")
 				.onClick(() => {
 					if (isFocused) {

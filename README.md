@@ -4,13 +4,7 @@ An Obsidian plugin that toggles any sidebar section to fill the full sidebar hei
 
 Obsidian splits each sidebar into multiple sections that share the available height. When you want one section to have room to breathe, this plugin collapses the others and gives it the full height. Toggle again to restore the original layout.
 
-| Before | After |
-|--------|-------|
-| ![Three cramped sidebar sections](screenshots/before.png) | ![One section focused at full height](screenshots/after.png) |
-
-Double-click or right-click any tab header to focus its section:
-
-![Context menu with "Focus this section"](screenshots/context-menu.png)
+![Demo of Focused Sidebar toggling sections](screenshots/demo.gif)
 
 ## Usage
 
@@ -18,7 +12,7 @@ Multiple ways to focus:
 
 - **Command palette:** "Toggle focused sidebar" (auto-detects left or right based on where you're working)
 - **Ribbon icon:** Click the sidebar icon in the left ribbon
-- **Right-click:** Right-click any sidebar tab header and choose "Focus this section"
+- **Right-click:** Right-click any sidebar tab header and choose "Focus section"
 - **Double-click:** Double-click any sidebar tab header to focus its section
 - **Targeted commands:** "Focus left sidebar" and "Focus right sidebar" for direct control
 - **Cycle:** "Cycle to next section" steps through sections while focused

@@ -314,7 +314,7 @@ var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
     const isFocused = this.focusedSide === side;
     menu.addSeparator();
     menu.addItem((item) => {
-      item.setTitle(isFocused ? "Unfocus sidebar" : "Focus this section").setIcon(isFocused ? "minimize" : "maximize").onClick(() => {
+      item.setTitle(isFocused ? "Unfocus section" : "Focus section").setIcon(isFocused ? "minimize" : "maximize").onClick(() => {
         if (isFocused) {
           this.unfocus();
         } else {
