@@ -26,7 +26,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           tag="${GITHUB_REF#refs/tags/}"
+          zip focused-sidebar.zip main.js manifest.json styles.css
           gh release create "$tag" \
             --title "$tag" \
             --generate-notes \
-            main.js manifest.json styles.css
+            main.js manifest.json styles.css focused-sidebar.zip
