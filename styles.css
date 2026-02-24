@@ -1,3 +1,12 @@
+/* ── macOS traffic light clearance ────────────────────── */
+/* Non-first sections lack the native left-padding that Obsidian gives
+   the first .workspace-tabs child for the traffic light buttons.
+   Re-apply it so tab icons don't overlap the window controls.         */
+body.mod-macos.focused-sidebar-active
+	.mod-left-split .focused-sidebar-target:not(:first-child) > .workspace-tab-header-container {
+	padding-left: var(--frame-left-space, 68px);
+}
+
 /* ── Collapse ─────────────────────────────────────────── */
 .focused-sidebar-collapsed {
 	max-height: 0 !important;

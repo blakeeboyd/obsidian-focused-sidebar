@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1
+
+- Fix focused section overlapping macOS traffic light buttons in the left sidebar
+- Known issue: first section tab icon shifts slightly when focused (cosmetic only)
+
 ## 0.1.0
 
 Initial release.

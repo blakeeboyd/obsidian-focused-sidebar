@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-focused-sidebar",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"description": "Toggle any sidebar section to full height",
 	"main": "main.js",
 	"scripts": {

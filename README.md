@@ -77,6 +77,10 @@ ln -s /path/to/obsidian-focused-sidebar /path/to/vault/.obsidian/plugins/focused
 
 **Phase 2: Dedicated full-height row.** A new icon row above the existing sidebar sections for panes that should always display at full height. The Phase 1 toggle would remain as a separate quick-focus command.
 
+## Platform support
+
+Tested on macOS only. Windows and Linux should work but have not been tested. If you encounter issues on those platforms, please open an issue.
+
 ## Technical notes
 
 - Uses unofficial but stable internal API properties (`WorkspaceSidedock.children`, `dimension`) that are used by other production plugins (Vertical Tabs, Sidebar Expand on Hover)
