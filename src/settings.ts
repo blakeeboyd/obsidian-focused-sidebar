@@ -1,7 +1,7 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
 import type FocusedSidebarPlugin from "./main";
 
-export type IndicatorStyle = "highlight" | "underline" | "dot" | "glow" | "icon-only" | "button";
+export type IndicatorStyle = "highlight" | "underline" | "glow" | "icon-only" | "button";
 
 export interface FocusedSidebarSettings {
 	indicatorStyle: IndicatorStyle;
@@ -11,16 +11,15 @@ export interface FocusedSidebarSettings {
 }
 
 export const DEFAULT_SETTINGS: FocusedSidebarSettings = {
-	indicatorStyle: "highlight",
+	indicatorStyle: "underline",
 	useCustomColor: false,
 	customColor: "#7f6df2",
 	showRibbonIcon: true,
 };
 
 const STYLE_DESCRIPTIONS: Record<IndicatorStyle, string> = {
-	highlight: "Background tint + underline",
 	underline: "Bottom border only",
-	dot: "Colored dot above the icon",
+	highlight: "Background tint + bottom border",
 	glow: "Soft glow behind the icon",
 	"icon-only": "Icon color change only",
 	button: "Colored button background",

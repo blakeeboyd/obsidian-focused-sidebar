@@ -64,15 +64,14 @@ function around1(obj, method, createWrapper) {
 // src/settings.ts
 var import_obsidian = require("obsidian");
 var DEFAULT_SETTINGS = {
-  indicatorStyle: "highlight",
+  indicatorStyle: "underline",
   useCustomColor: false,
   customColor: "#7f6df2",
   showRibbonIcon: true
 };
 var STYLE_DESCRIPTIONS = {
-  highlight: "Background tint + underline",
   underline: "Bottom border only",
-  dot: "Colored dot above the icon",
+  highlight: "Background tint + bottom border",
   glow: "Soft glow behind the icon",
   "icon-only": "Icon color change only",
   button: "Colored button background"

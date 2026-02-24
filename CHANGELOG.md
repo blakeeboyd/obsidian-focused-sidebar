@@ -7,7 +7,7 @@ Initial release.
 - Toggle any sidebar section to full height
 - Four entry points: command palette, ribbon icon, right-click menu, double-click
 - Targeted commands for left sidebar, right sidebar, and cycling sections
-- Six indicator styles: highlight, underline, dot, glow, icon-only, button
+- Five indicator styles: highlight, underline, glow, icon-only, button
 - Custom color picker (or uses theme accent color)
 - Smooth CSS transitions
 - ARIA attributes on collapsed sections

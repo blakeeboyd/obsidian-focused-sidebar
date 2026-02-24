@@ -20,15 +20,19 @@ body.focused-sidebar-active .focused-sidebar-target .workspace-tab-header.is-act
 	--_fs-rgb: var(--focused-sidebar-color-rgb);
 }
 
-/* Icon gets the indicator color (except for button style, which only colors the background) */
-body.focused-sidebar-active:not([data-focused-sidebar-style="button"])
+/* Icon gets the indicator color (highlight and icon-only styles only) */
+body.focused-sidebar-active[data-focused-sidebar-style="highlight"]
 	.focused-sidebar-target .workspace-tab-header.is-active .workspace-tab-header-inner-icon,
-body.focused-sidebar-active:not([data-focused-sidebar-style="button"])
+body.focused-sidebar-active[data-focused-sidebar-style="highlight"]
+	.focused-sidebar-target .workspace-tab-header.is-active .workspace-tab-header-inner-icon svg,
+body.focused-sidebar-active[data-focused-sidebar-style="icon-only"]
+	.focused-sidebar-target .workspace-tab-header.is-active .workspace-tab-header-inner-icon,
+body.focused-sidebar-active[data-focused-sidebar-style="icon-only"]
 	.focused-sidebar-target .workspace-tab-header.is-active .workspace-tab-header-inner-icon svg {
 	color: var(--_fs-color);
 }
 
-/* ── Style: highlight (background tint + underline) ──── */
+/* ── Style: highlight (background tint + bottom border) ─ */
 body.focused-sidebar-active[data-focused-sidebar-style="highlight"]
 	.focused-sidebar-target .workspace-tab-header.is-active,
 body.focused-sidebar-active[data-focused-sidebar-style="highlight"]
@@ -42,25 +46,6 @@ body.focused-sidebar-active[data-focused-sidebar-style="highlight"]
 body.focused-sidebar-active[data-focused-sidebar-style="underline"]
 	.focused-sidebar-target .workspace-tab-header.is-active {
 	box-shadow: inset 0 -3px 0 0 var(--_fs-color);
-}
-
-/* ── Style: dot (colored dot above icon) ─────────────── */
-body.focused-sidebar-active[data-focused-sidebar-style="dot"]
-	.focused-sidebar-target .workspace-tab-header.is-active .workspace-tab-header-inner-icon {
-	position: relative;
-}
-
-body.focused-sidebar-active[data-focused-sidebar-style="dot"]
-	.focused-sidebar-target .workspace-tab-header.is-active .workspace-tab-header-inner-icon::after {
-	content: "";
-	position: absolute;
-	top: -4px;
-	left: 50%;
-	transform: translateX(-50%);
-	width: 6px;
-	height: 6px;
-	border-radius: 50%;
-	background-color: var(--_fs-color);
 }
 
 /* ── Style: glow (soft glow behind icon) ─────────────── */

@@ -2,13 +2,13 @@
 
 An Obsidian plugin that toggles any sidebar section to fill the full sidebar height.
 
-Obsidian splits each sidebar into three fixed sections. When you want one section to have room to breathe, this plugin collapses the others and gives it the full height. Toggle again to restore the original layout.
+Obsidian splits each sidebar into multiple sections that share the available height. When you want one section to have room to breathe, this plugin collapses the others and gives it the full height. Toggle again to restore the original layout.
 
 | Before | After |
 |--------|-------|
 | ![Three cramped sidebar sections](screenshots/before.png) | ![One section focused at full height](screenshots/after.png) |
 
-Right-click any tab header to focus its section:
+Double-click or right-click any tab header to focus its section:
 
 ![Context menu with "Focus this section"](screenshots/context-menu.png)
 
@@ -27,10 +27,9 @@ All commands can be bound to hotkeys in Settings > Hotkeys.
 
 ## Settings
 
-- **Indicator style** — How the focused tab is highlighted. Six options:
-  - *Highlight* — Background tint + colored underline (default)
-  - *Underline* — Bottom border only
-  - *Dot* — Small colored dot above the icon
+- **Indicator style** — How the focused tab is highlighted. Five options:
+  - *Underline* — Bottom border only (default)
+  - *Highlight* — Background tint + bottom border
   - *Glow* — Soft glow behind the icon
   - *Icon only* — Icon color change, no background effect
   - *Button* — Colored button background
