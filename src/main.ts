@@ -46,7 +46,7 @@ function getResolvedColor(property: string, fallback: string): string {
 export default class FocusedSidebarPlugin extends Plugin {
 	settings: FocusedSidebarSettings = DEFAULT_SETTINGS;
 	private savedDimensions: Map<string, number[]> = new Map();
-	private focusedSide: Side | null = null;
+	private focusedSides: Set<Side> = new Set();
 	private unpatchMenu: (() => void) | null = null;
 	private dblClickHandler: ((evt: MouseEvent) => void) | null = null;
 	private statusBarEl: HTMLElement | null = null;
@@ -99,8 +99,11 @@ export default class FocusedSidebarPlugin extends Plugin {
 	}
 
 	onunload(): void {
-		if (this.focusedSide) {
-			this.restoreDimensions(this.focusedSide);
+		if (this.focusedSides.size) {
+			for (const side of this.focusedSides) {
+				this.restoreDimensions(side);
+			}
+			this.focusedSides.clear();
 			document.body.removeClass(ACTIVE_CLASS);
 			this.removeStyleAttrs();
 		}
@@ -120,12 +123,12 @@ export default class FocusedSidebarPlugin extends Plugin {
 			DEFAULT_SETTINGS,
 			await this.loadData()
 		);
-		if (this.focusedSide) this.applyStyleAttrs();
+		if (this.focusedSides.size) this.applyStyleAttrs();
 	}
 
 	async saveSettings(): Promise<void> {
 		await this.saveData(this.settings);
-		if (this.focusedSide) this.applyStyleAttrs();
+		if (this.focusedSides.size) this.applyStyleAttrs();
 	}
 
 	/** Push settings into CSS custom properties and a data attribute on body. */
@@ -169,10 +172,10 @@ export default class FocusedSidebarPlugin extends Plugin {
 
 			const { side, split, sectionIndex, clickedLeaf } = hit;
 			this.lastInteractedSide = side;
-			const isFocused = this.focusedSide === side;
+			const isFocused = this.focusedSides.has(side);
 
 			if (isFocused) {
-				this.unfocus();
+				this.unfocus(side);
 			} else {
 				this.focusSection(side, split, sectionIndex);
 			}
@@ -189,7 +192,7 @@ export default class FocusedSidebarPlugin extends Plugin {
 	private registerCssChange(): void {
 		this.registerEvent(
 			this.app.workspace.on("css-change", () => {
-				if (this.focusedSide && !this.settings.useCustomColor) {
+				if (this.focusedSides.size && !this.settings.useCustomColor) {
 					this.applyStyleAttrs();
 				}
 			})
@@ -199,12 +202,14 @@ export default class FocusedSidebarPlugin extends Plugin {
 	private registerLayoutChange(): void {
 		this.registerEvent(
 			this.app.workspace.on("layout-change", () => {
-				if (!this.focusedSide) return;
-				const split = this.getSplit(this.focusedSide);
-				if (!split) return;
-				const saved = this.savedDimensions.get(this.focusedSide);
-				if (saved && split.children.length !== saved.length) {
-					this.unfocus();
+				if (!this.focusedSides.size) return;
+				for (const side of [...this.focusedSides]) {
+					const split = this.getSplit(side);
+					if (!split) continue;
+					const saved = this.savedDimensions.get(side);
+					if (saved && split.children.length !== saved.length) {
+						this.unfocus(side);
+					}
 				}
 			})
 		);
@@ -272,7 +277,7 @@ export default class FocusedSidebarPlugin extends Plugin {
 
 		const { side, split, sectionIndex, clickedLeaf } = hit;
 		this.lastInteractedSide = side;
-		const isFocused = this.focusedSide === side;
+		const isFocused = this.focusedSides.has(side);
 
 		menu.addSeparator();
 		menu.addItem((item) => {
@@ -280,7 +285,7 @@ export default class FocusedSidebarPlugin extends Plugin {
 				.setIcon(isFocused ? "minimize" : "maximize")
 				.onClick(() => {
 					if (isFocused) {
-						this.unfocus();
+						this.unfocus(side);
 					} else {
 						this.focusSection(side, split, sectionIndex);
 					}
@@ -308,8 +313,8 @@ export default class FocusedSidebarPlugin extends Plugin {
 		}
 
 		// Already focused on this side — restore
-		if (this.focusedSide === side) {
-			this.unfocus();
+		if (this.focusedSides.has(side)) {
+			this.unfocus(side);
 			return;
 		}
 
@@ -330,8 +335,8 @@ export default class FocusedSidebarPlugin extends Plugin {
 			return;
 		}
 
-		if (this.focusedSide === side) {
-			this.unfocus();
+		if (this.focusedSides.has(side)) {
+			this.unfocus(side);
 			return;
 		}
 
@@ -340,19 +345,24 @@ export default class FocusedSidebarPlugin extends Plugin {
 	}
 
 	private cycleFocus(): void {
-		if (!this.focusedSide) {
+		if (!this.focusedSides.size) {
 			new Notice("No section is focused.");
 			return;
 		}
 
-		const split = this.getSplit(this.focusedSide);
+		// Cycle the last-interacted focused side, else any focused side.
+		const side = this.focusedSides.has(this.lastInteractedSide)
+			? this.lastInteractedSide
+			: [...this.focusedSides][0];
+
+		const split = this.getSplit(side);
 		if (!split || split.children.length <= 1) return;
 
 		const currentIndex = split.children.findIndex(
 			(s) => s.containerEl.hasClass(TARGET_CLASS)
 		);
 		const nextIndex = (currentIndex + 1) % split.children.length;
-		this.focusSection(this.focusedSide, split, nextIndex);
+		this.focusSection(side, split, nextIndex);
 	}
 
 	private focusSection(
@@ -362,11 +372,6 @@ export default class FocusedSidebarPlugin extends Plugin {
 	): void {
 		const sections = split.children;
 		if (sectionIndex < 0 || sectionIndex >= sections.length) return;
-
-		// Restore other side if focused
-		if (this.focusedSide && this.focusedSide !== side) {
-			this.restoreDimensions(this.focusedSide);
-		}
 
 		// Save current dimensions (only if not already saved for this side)
 		if (!this.savedDimensions.has(side)) {
@@ -394,19 +399,21 @@ export default class FocusedSidebarPlugin extends Plugin {
 		});
 
 		this.applyLayout(split, false);
-		this.focusedSide = side;
+		this.focusedSides.add(side);
 		this.applyStyleAttrs();
 		document.body.addClass(ACTIVE_CLASS);
-		this.updateStatusBar(side);
+		this.updateStatusBar();
 	}
 
-	private unfocus(): void {
-		if (!this.focusedSide) return;
-		this.restoreDimensions(this.focusedSide);
-		this.focusedSide = null;
-		document.body.removeClass(ACTIVE_CLASS);
-		this.removeStyleAttrs();
-		this.updateStatusBar(null);
+	private unfocus(side: Side): void {
+		if (!this.focusedSides.has(side)) return;
+		this.restoreDimensions(side);
+		this.focusedSides.delete(side);
+		if (!this.focusedSides.size) {
+			document.body.removeClass(ACTIVE_CLASS);
+			this.removeStyleAttrs();
+		}
+		this.updateStatusBar();
 	}
 
 	private restoreDimensions(side: Side): void {
@@ -450,10 +457,13 @@ export default class FocusedSidebarPlugin extends Plugin {
 		}
 	}
 
-	private updateStatusBar(side: Side | null): void {
+	private updateStatusBar(): void {
 		if (!this.statusBarEl) return;
-		if (side) {
-			this.statusBarEl.setText(`Focused: ${side}`);
+		if (this.focusedSides.size) {
+			const sides = (["left", "right"] as Side[]).filter((s) =>
+				this.focusedSides.has(s)
+			);
+			this.statusBarEl.setText(`Focused: ${sides.join(" + ")}`);
 			this.statusBarEl.style.display = "";
 		} else {
 			this.statusBarEl.style.display = "none";
