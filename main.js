@@ -154,7 +154,7 @@ var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
     super(...arguments);
     this.settings = DEFAULT_SETTINGS;
     this.savedDimensions = /* @__PURE__ */ new Map();
-    this.focusedSide = null;
+    this.focusedSides = /* @__PURE__ */ new Set();
     this.unpatchMenu = null;
     this.dblClickHandler = null;
     this.statusBarEl = null;
@@ -199,8 +199,11 @@ var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
     this.registerCssChange();
   }
   onunload() {
-    if (this.focusedSide) {
-      this.restoreDimensions(this.focusedSide);
+    if (this.focusedSides.size) {
+      for (const side of this.focusedSides) {
+        this.restoreDimensions(side);
+      }
+      this.focusedSides.clear();
       document.body.removeClass(ACTIVE_CLASS);
       this.removeStyleAttrs();
     }
@@ -219,11 +222,11 @@ var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
       DEFAULT_SETTINGS,
       await this.loadData()
     );
-    if (this.focusedSide) this.applyStyleAttrs();
+    if (this.focusedSides.size) this.applyStyleAttrs();
   }
   async saveSettings() {
     await this.saveData(this.settings);
-    if (this.focusedSide) this.applyStyleAttrs();
+    if (this.focusedSides.size) this.applyStyleAttrs();
   }
   /** Push settings into CSS custom properties and a data attribute on body. */
   applyStyleAttrs() {
@@ -256,9 +259,9 @@ var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
       evt.stopPropagation();
       const { side, split, sectionIndex, clickedLeaf } = hit;
       this.lastInteractedSide = side;
-      const isFocused = this.focusedSide === side;
+      const isFocused = this.focusedSides.has(side);
       if (isFocused) {
-        this.unfocus();
+        this.unfocus(side);
       } else {
         this.focusSection(side, split, sectionIndex);
       }
@@ -271,7 +274,7 @@ var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
   registerCssChange() {
     this.registerEvent(
       this.app.workspace.on("css-change", () => {
-        if (this.focusedSide && !this.settings.useCustomColor) {
+        if (this.focusedSides.size && !this.settings.useCustomColor) {
           this.applyStyleAttrs();
         }
       })
@@ -280,12 +283,14 @@ var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
   registerLayoutChange() {
     this.registerEvent(
       this.app.workspace.on("layout-change", () => {
-        if (!this.focusedSide) return;
-        const split = this.getSplit(this.focusedSide);
-        if (!split) return;
-        const saved = this.savedDimensions.get(this.focusedSide);
-        if (saved && split.children.length !== saved.length) {
-          this.unfocus();
+        if (!this.focusedSides.size) return;
+        for (const side of [...this.focusedSides]) {
+          const split = this.getSplit(side);
+          if (!split) continue;
+          const saved = this.savedDimensions.get(side);
+          if (saved && split.children.length !== saved.length) {
+            this.unfocus(side);
+          }
         }
       })
     );
@@ -331,12 +336,12 @@ var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
     if (!hit) return;
     const { side, split, sectionIndex, clickedLeaf } = hit;
     this.lastInteractedSide = side;
-    const isFocused = this.focusedSide === side;
+    const isFocused = this.focusedSides.has(side);
     menu.addSeparator();
     menu.addItem((item) => {
       item.setTitle(isFocused ? "Unfocus section" : "Focus section").setIcon(isFocused ? "minimize" : "maximize").onClick(() => {
         if (isFocused) {
-          this.unfocus();
+          this.unfocus(side);
         } else {
           this.focusSection(side, split, sectionIndex);
         }
@@ -360,8 +365,8 @@ var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
       new import_obsidian2.Notice("Sidebar has only one section.");
       return;
     }
-    if (this.focusedSide === side) {
-      this.unfocus();
+    if (this.focusedSides.has(side)) {
+      this.unfocus(side);
       return;
     }
     const activeIndex = this.findActiveSectionIndex(split);
@@ -378,32 +383,30 @@ var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
       new import_obsidian2.Notice("Sidebar has only one section.");
       return;
     }
-    if (this.focusedSide === side) {
-      this.unfocus();
+    if (this.focusedSides.has(side)) {
+      this.unfocus(side);
       return;
     }
     const activeIndex = this.findActiveSectionIndex(split);
     this.focusSection(side, split, activeIndex);
   }
   cycleFocus() {
-    if (!this.focusedSide) {
+    if (!this.focusedSides.size) {
       new import_obsidian2.Notice("No section is focused.");
       return;
     }
-    const split = this.getSplit(this.focusedSide);
+    const side = this.focusedSides.has(this.lastInteractedSide) ? this.lastInteractedSide : [...this.focusedSides][0];
+    const split = this.getSplit(side);
     if (!split || split.children.length <= 1) return;
     const currentIndex = split.children.findIndex(
       (s) => s.containerEl.hasClass(TARGET_CLASS)
     );
     const nextIndex = (currentIndex + 1) % split.children.length;
-    this.focusSection(this.focusedSide, split, nextIndex);
+    this.focusSection(side, split, nextIndex);
   }
   focusSection(side, split, sectionIndex) {
     const sections = split.children;
     if (sectionIndex < 0 || sectionIndex >= sections.length) return;
-    if (this.focusedSide && this.focusedSide !== side) {
-      this.restoreDimensions(this.focusedSide);
-    }
     if (!this.savedDimensions.has(side)) {
       this.savedDimensions.set(
         side,
@@ -424,18 +427,20 @@ var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
       }
     });
     this.applyLayout(split, false);
-    this.focusedSide = side;
+    this.focusedSides.add(side);
     this.applyStyleAttrs();
     document.body.addClass(ACTIVE_CLASS);
-    this.updateStatusBar(side);
+    this.updateStatusBar();
   }
-  unfocus() {
-    if (!this.focusedSide) return;
-    this.restoreDimensions(this.focusedSide);
-    this.focusedSide = null;
-    document.body.removeClass(ACTIVE_CLASS);
-    this.removeStyleAttrs();
-    this.updateStatusBar(null);
+  unfocus(side) {
+    if (!this.focusedSides.has(side)) return;
+    this.restoreDimensions(side);
+    this.focusedSides.delete(side);
+    if (!this.focusedSides.size) {
+      document.body.removeClass(ACTIVE_CLASS);
+      this.removeStyleAttrs();
+    }
+    this.updateStatusBar();
   }
   restoreDimensions(side) {
     const saved = this.savedDimensions.get(side);
@@ -473,10 +478,13 @@ var FocusedSidebarPlugin = class extends import_obsidian2.Plugin {
       this.ribbonIconEl = null;
     }
   }
-  updateStatusBar(side) {
+  updateStatusBar() {
     if (!this.statusBarEl) return;
-    if (side) {
-      this.statusBarEl.setText(`Focused: ${side}`);
+    if (this.focusedSides.size) {
+      const sides = ["left", "right"].filter(
+        (s) => this.focusedSides.has(s)
+      );
+      this.statusBarEl.setText(`Focused: ${sides.join(" + ")}`);
       this.statusBarEl.style.display = "";
     } else {
       this.statusBarEl.style.display = "none";
