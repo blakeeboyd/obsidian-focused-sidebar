@@ -6,11 +6,14 @@
    Skip sections that already carry .mod-top-left-space: Obsidian keeps
    that class on the visible-topmost section (which a focused first
    section still is) and computes the correct clearance itself. Touching
-   them would override the native padding with a smaller value and shift
-   the icon left.                                                       */
+   them would override the native padding and shift the icon.
+
+   Use --ribbon-width (44px) for the clearance. It matches the value the
+   native .mod-top-left-space rule applies; --frame-left-space resolves
+   to a smaller value (36px) and lands the icon 8px too far left.       */
 body.mod-macos.focused-sidebar-active
 	.mod-left-split .focused-sidebar-target:not(:first-child):not(.mod-top-left-space) > .workspace-tab-header-container {
-	padding-left: var(--frame-left-space, 68px);
+	padding-left: var(--ribbon-width, 44px);
 }
 
 /* ── Collapse ─────────────────────────────────────────── */
