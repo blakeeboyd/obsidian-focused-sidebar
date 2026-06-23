@@ -12,22 +12,30 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
 
       - run: npm install
       - run: npm run build
 
-      - name: Create release
+      - name: Create or update release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           tag="${GITHUB_REF#refs/tags/}"
           zip focused-sidebar.zip main.js manifest.json styles.css
-          gh release create "$tag" \
-            --title "$tag" \
-            --generate-notes \
-            main.js manifest.json styles.css focused-sidebar.zip
+          assets="main.js manifest.json styles.css focused-sidebar.zip"
+          # Idempotent: create the release if missing, otherwise upload
+          # (clobbering) the assets onto the existing release. Prevents the
+          # "release already exists" failure when a release was made by hand.
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" $assets --clobber
+          else
+            gh release create "$tag" \
+              --title "$tag" \
+              --generate-notes \
+              $assets
+          fi
